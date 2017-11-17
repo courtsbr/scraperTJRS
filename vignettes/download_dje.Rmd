@@ -1,0 +1,121 @@
+---
+title: "Download dos DJE's"
+author: "Fernando Corrês"
+date: "2016-06-22"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+Para fazer o download dos DJE utilize o seguinte código:
+
+```{r, echo = FALSE}
+meses_a_coletar <- readRDS('/home/storage/platipus/projects/scrapers/scraperTJRS/meses_a_coletar.rds')
+```
+
+```{r, echo = FALSE}
+local_pdf <- '/mnt/storage/platipus/raw/estadual/TJRS/dje/'
+
+library(dplyr)
+
+resultado <- meses_a_coletar  %>% 
+  filter(!is.na(data)) %>%
+#  head(100) %>% 
+  select(-mesano) %>% 
+  plyr::mdply(download_diario_oficial_tjrs, pasta = local_pdf)
+
+baixados <- data_frame(arq = list.files(local_pdf)) %>%
+  mutate(nome_caderno = gsub('.pdf','',substr(arq,21,nchar(arq)), fixed = T),
+         data = substr(arq, 10, 19))
+```
+
+```{r}
+
+Rpdf <- readPDF(control = list(text = "-layout"))
+
+
+djes <- list.files(local_pdf, full.names = T)
+
+arqs <- Corpus(URISource(djes[1:10]), 
+                   readerControl = list(reader = Rpdf)) %>% 
+  tm_map(content_transformer(tolower))
+
+dtm <- DocumentTermMatrix(arqs)
+
+
+
+```
+
+
+```{r, echo = FALSE}
+meses_a_coletar <- readRDS('meses_a_coletar.rds')
+
+local_page_matchs <- '/home/storage/platipus/raw/estadual/TJRS/pages/'
+
+dir.create(local_page_matchs, recursive = T)
+
+edicoes <- meses_a_coletar %>% 
+  filter(!is.na(ed)) %>% 
+  with(unique(ed))
+
+ed_test <- edicoes[1]
+
+links = character()
+
+for(e in edicoes){
+  links <- c(links,unlist(matches_busca_livre_tjrs('bamerindus',e)))
+}
+
+links_hsbc = character()
+
+for(e in edicoes){
+  links_hsbc <- c(links,unlist(matches_busca_livre_tjrs('hsbc',e)))
+}
+
+links_sistema = character()
+
+for(e in edicoes){
+  links_sistema <- c(links,unlist(matches_busca_livre_tjrs('banco sistema',e)))
+}
+
+links <- bind_rows(data_frame(link = links, banco = 'bamerindus'),
+         data_frame(link = links_hsbc, banco = 'hsbc'),
+         data_frame(link = links_sistema, banco = 'banco sistema'))
+
+links <- links %>% 
+         mutate(id = 1:n(),
+                path = paste0(local_page_matchs,'page_',banco,'_',id,'.pdf'))
+
+saveRDS(links, 'paginas_bam_hsbc_sist.rds')
+
+links %>% 
+  select(link, path) %>% 
+  plyr::d_ply(c('link','path'),function(x){
+    final <- x$link %>% 
+      rvest::html_session() %>% 
+      rvest::html_nodes('iframe') %>% 
+      rvest::html_attr('src')
+    
+    u <- sprintf('http://www3.tjrs.jus.br/servicos/diario_justica/%s',final)
+      
+    download_pdf_tjrs(u, x$path)
+    })
+
+```
+
+```{r, echo = FALSE}
+
+local_page_matchs_txt <- '/home/storage/platipus/raw/estadual/TJRS/pages/txt'
+
+dir.create(local_page_matchs_txt)
+
+
+links %>% 
+  mutate(path_txt = gsub('pages','txt',path)) %>% 
+  plyr::d_ply(.c('link','path'), function(x){
+    
+  })
+
+```

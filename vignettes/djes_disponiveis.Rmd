@@ -1,0 +1,66 @@
+---
+title: "Informações básicas sobre o scraper de TJRS"
+author: "Fernando C."
+date: "4 de Julho de 2016"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Lista de links dos cadernos
+
+O download dos DJE's do TJRS é feito visitando links da forma
+
+<http://www3.tjrs.jus.br/servicos/diario_justica/download_edicao.php?tp=[caderno]&ed=[edição]>
+
+como por exemplo
+
+<http://www3.tjrs.jus.br/servicos/diario_justica/download_edicao.php?tp=5&ed=5823> e 
+
+<http://www3.tjrs.jus.br/servicos/diario_justica/download_edicao.php?tp=5&ed=3424>
+
+
+Em <http://www.tjrs.jus.br/busca/?tb=dj> tem um menu *roll-over* com todos os períodos para os quais existem DJE's disponíveis. O menu é alimentado por um conjunto de tabelas em JSON que vêm de links da forma <http://www.tjrs.jus.br/servicodag/?callback=edicoesPeriodo&tipo=periodo&periodo=[mes-ano]&_=1467218025980>. 
+
+Para decidirmos o que baixar, vamos construir uma tabela contendo, para todo caderno disponível, as seguintes informações:
+
+1. Data do DJE
+2. Nome do caderno
+3. Link de download
+
+A construção é feita:
+
+```{r, eval = FALSE}
+library(magrittr)
+
+meses_a_coletar <- expand.grid(1:12,2006:2016) %>% 
+  dplyr::transmute(mesano = sprintf('%.2d-%d',Var1,Var2)) %>% 
+  plyr::mdply(lista_dje_mes)
+
+meses_a_coletar %<>%
+  dplyr::mutate(ed = stringi::stri_extract_all(regex = 'ed\\=[0-9]{4}',link),
+                ed = gsub('ed\\=','',ed))
+
+saveRDS(meses_a_coletar,'meses_a_coletar.rds')
+```
+ 
+```{r, echo = FALSE}
+meses_a_coletar <- readRDS('meses_a_coletar.rds')
+```
+
+Grande parte dos cadernos encontrados não fornecem informações sobre processos judiciais em curso ou sendo distribuídos, como no casos das listas de jurados, por exemplo. Excluindo esses casos, continuamos com os cadernos da tabela abaixo:
+
+```{r, echo = FALSE}
+library(magrittr)
+
+meses_a_coletar %>% 
+  dplyr::filter(!grepl('[Jj]urados|Tabela de Emolumentos',nome_caderno),
+                !is.na(nome_caderno)) %>% 
+  dplyr::count(nome_caderno) %>% 
+  setNames(c('Nome do caderno', 'Observações')) %>% 
+  dplyr::arrange_(desc('Observações')) %>% 
+  pander::pander()
+```
+

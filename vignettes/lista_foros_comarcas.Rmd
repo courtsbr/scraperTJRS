@@ -1,0 +1,36 @@
+---
+title: "Lista de foros e comarcas do TJRS"
+author: "Fernando Corrêa"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+Esse código produz a tabela que associa comarcas e foros do TJRS a códigos númericos.
+
+```{r, results='asis', warning=FALSE, error=FALSE, message=FALSE}
+library(dplyr)
+library(abjutils)
+
+comarcas_tjrs <- 'http://www.tjrs.jus.br/site/processos/numeracao_unica_de_processos_judiciais/' %>% 
+  xml2::read_html()  %>% 
+  rvest::html_table(header = T)  %>% 
+  as.data.frame()  %>% 
+  dplyr::as_data_frame() %>% 
+  dplyr::mutate(codigo_themis = substr(`Código`, 2,4),
+                nome_comarca = gsub(' ','+',`Órgãos`),
+                id_comarca = gsub(' d[eo] | ','_',rm_accent(tolower(`Órgãos`))))  %>% 
+  setNames(c('orgaos','origem','codigo','codigo_themis','nome_comarca','id_comarca'))
+
+comarcas_tjrs %>% 
+  pander::pandoc.table()
+    
+```
+
+
+
+
+

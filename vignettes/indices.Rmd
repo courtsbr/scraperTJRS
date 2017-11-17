@@ -1,0 +1,44 @@
+---
+title: "Índices e processos"
+author: "Fernando Corrêa"
+date: "4 de julho de 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+meses_a_coletar <- readRDS('meses_a_coletar.rds')
+```
+
+## Índices
+ 
+Mesmo quando é necessário fazer buscas em DJE's, pode ser útil utilizar o índice para minimizar o número de páginas que serão lidas. Além disso, essa prática diminui o total de iterações de possíveis fases subsequentes à leitura dos diários, como por exemplo o acesso a portais e-SAJ.
+
+O código abaixo exemplifica a extração de índices de uma amostra de DJE's do TJRS.
+
+```{r}
+library(magrittr)
+
+n <- 1
+
+amostra <- meses_a_coletar %>% 
+  dplyr::filter(nome_caderno == 'Capital 1º Grau') %>% 
+  dplyr::sample_n(n) %>% 
+  dplyr::select(link) %>% 
+  dplyr::mutate(arq = sapply(1:n,function(x){tempfile()})) %>% 
+  plyr::mdply(function(link,arq){
+    download.file(link,arq)
+    system(sprintf('pdftotext -raw -f 1 -l 2 %s %s.txt',arq, arq))
+    #o -raw é muito importante porque o conteúdo está dividido em duas colunas que são lidas em linhas diferentes quando essa opção está desativada
+    #como vamos apenas procurar o índice não é necessário converter todas as páginas. Vamos nos ater às duas primeiras.
+  }) %>% 
+  dplyr::mutate(arq = paste0(arq,'.txt'))
+
+indice <- extrair_indice(amostra$arq[1])
+
+```
+
+Em posse do índice é possível converter para texto apenas as páginas de interesse
+
+```{r}
+```
